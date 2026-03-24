@@ -95,16 +95,14 @@ def _resolve_episode_fraction(config: dict[str, Any]) -> dict[str, Any]:
         from lerobot.datasets.lerobot_dataset import LeRobotDataset
 
         dataset = LeRobotDataset(repo_id)
-        # Build episodes_per_task mapping
+        # Build episodes_per_task mapping from HF Dataset episodes
         episodes_per_task: dict[str, list[int]] = {}
-        if hasattr(dataset.meta, "tasks") and dataset.meta.tasks:
-            task_descriptions = dataset.meta.tasks
-            for ep_idx, ep_info in dataset.meta.episodes.items():
-                task_idx = ep_info.get("task_index", 0)
-                task = task_descriptions.get(task_idx, f"task_{task_idx}")
-                episodes_per_task.setdefault(task, []).append(int(ep_idx))
-        else:
-            episodes_per_task["default"] = list(range(dataset.num_episodes))
+        for i in range(len(dataset.meta.episodes)):
+            ep = dataset.meta.episodes[i]
+            ep_idx = ep["episode_index"]
+            task_list = ep.get("tasks", [])
+            task = task_list[0] if task_list else f"task_{ep_idx}"
+            episodes_per_task.setdefault(task, []).append(int(ep_idx))
     except Exception:
         # Fallback: assume 379 episodes, no stratification
         all_eps = list(range(379))

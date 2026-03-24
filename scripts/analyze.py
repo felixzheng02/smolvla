@@ -30,20 +30,19 @@ def extract_meta(dataset) -> dict:
 
 
 def extract_episode_tasks(dataset) -> dict[int, str]:
-    """Map episode_index -> task string from dataset metadata."""
-    # LeRobot v0.5+ stores tasks in meta
+    """Map episode_index -> task string from dataset metadata.
+
+    LeRobot v0.4+: meta.episodes is an HF Dataset with 'tasks' column (list[str]).
+    meta.tasks is a pandas DataFrame (index=task_desc, column=task_index).
+    """
     tasks_map = {}
-    if hasattr(dataset.meta, "tasks") and dataset.meta.tasks:
-        # meta.tasks is {task_index: task_description}
-        task_descriptions = dataset.meta.tasks
-        # meta.episodes maps episode_index -> {task_index: ...}
-        for ep_idx, ep_info in dataset.meta.episodes.items():
-            task_idx = ep_info.get("task_index", 0)
-            tasks_map[int(ep_idx)] = task_descriptions.get(task_idx, f"task_{task_idx}")
-    else:
-        # Fallback: read from the dataset directly
-        for ep_idx in range(dataset.num_episodes):
-            tasks_map[ep_idx] = f"task_{ep_idx}"
+    episodes = dataset.meta.episodes
+    for i in range(len(episodes)):
+        ep = episodes[i]
+        ep_idx = ep["episode_index"]
+        # 'tasks' column contains list of task descriptions
+        task_list = ep.get("tasks", [])
+        tasks_map[int(ep_idx)] = task_list[0] if task_list else f"task_{ep_idx}"
     return tasks_map
 
 

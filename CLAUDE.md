@@ -57,9 +57,11 @@ mamba run -n smolvla python scripts/ablate.py --skip-training --skip-eval  # rep
 - **Dataset:** `lerobot/libero_10_image` — 379 episodes, 10 tasks, 101k frames, Franka Panda, 8D state + 7D action + 2x 256×256 cameras
 - **Base checkpoint:** `lerobot/smolvla_base` (450M params)
 - **Fine-tuning:** LoRA via LeRobot's `--peft.*` flags (rank=32, LR=1e-3, default target modules: q/v proj + action/state proj)
-- **Simulator:** LIBERO/robosuite (CPU physics, no GPU needed for eval)
+- **Critical flags:** `policy.load_vlm_weights=true` (loads pretrained weights), `policy.push_to_hub=false`, `eval_freq=0` (eval env creation OOMs; evaluate separately after training)
+- **Simulator:** LIBERO/robosuite 1.4.1 (CPU physics, no GPU needed for eval). robosuite 1.5.x is incompatible with libero.
 - **OOD conditions:** (1) paraphrased instructions, (2) cross-suite transfer to `libero_spatial`
 - **Ablations:** dataset size (25%/50%/100%), training steps (5k/10k/20k), LoRA rank (8/32/64)
+- **Performance:** ~17 steps/sec at batch_size=2, ~5 steps/sec at batch_size=8 (RTX 5080, LoRA)
 
 ## Architecture
 

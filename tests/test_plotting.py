@@ -66,6 +66,32 @@ class TestPlotLossCurve:
         plot_loss_curve(log, out)
         assert out.exists()
 
+    def test_lerobot_log_format(self, tmp_path: Path) -> None:
+        """Test parsing lerobot training log output."""
+        log = tmp_path / "train.log"
+        log.write_text(
+            "INFO step:50 smpl:400 ep:1 epch:0.00 loss:0.644 grdn:0.115 lr:4.0e-05 updt_s:0.114\n"
+            "INFO step:100 smpl:800 ep:3 epch:0.01 loss:0.420 grdn:0.123 lr:9.9e-04 updt_s:0.130\n"
+            "INFO step:2K smpl:16K ep:60 epch:0.16 loss:0.140 grdn:0.081 lr:9.9e-04 updt_s:0.105\n"
+        )
+        out = tmp_path / "loss.png"
+        plot_loss_curve(log, out)
+        assert out.exists()
+
+    def test_parse_lerobot_log(self, tmp_path: Path) -> None:
+        from src.plotting import parse_lerobot_log
+
+        log = tmp_path / "train.log"
+        log.write_text(
+            "step:50 smpl:400 loss:0.644 grdn:0.115 lr:4.0e-05\n"
+            "step:2K smpl:16K loss:0.140 grdn:0.081 lr:9.9e-04\n"
+        )
+        records = parse_lerobot_log(log)
+        assert len(records) == 2
+        assert records[0]["step"] == 50
+        assert records[0]["loss"] == 0.644
+        assert records[1]["step"] == 2000
+
 
 class TestPlotEvalResults:
     """Tests for plot_eval_results."""

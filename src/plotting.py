@@ -10,26 +10,54 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-def plot_loss_curve(log_path: Path, output_path: Path) -> None:
-    """Plot training loss (and optionally val_loss / lr) vs step from a log file."""
+def parse_lerobot_log(log_path: Path) -> list[dict]:
+    """Parse lerobot training log lines.
+
+    Handles the format: step:50 smpl:400 ep:1 loss:0.644 grdn:0.115 lr:4.0e-05
+    Also handles JSON lines and CSV formats.
+    """
+    import re
+
     log_path = Path(log_path)
     records: list[dict] = []
 
-    # Try JSON lines first, fall back to CSV
     with open(log_path) as f:
         first_line = f.readline().strip()
 
     if first_line.startswith("{"):
+        # JSON lines format
         with open(log_path) as f:
             for line in f:
                 line = line.strip()
                 if line:
                     records.append(json.loads(line))
-    else:
+    elif "," in first_line and not first_line.startswith("step:"):
+        # CSV format
         with open(log_path) as f:
             reader = csv.DictReader(f)
             for row in reader:
                 records.append({k: float(v) for k, v in row.items()})
+    else:
+        # lerobot log format: step:X smpl:Y loss:Z grdn:W lr:V
+        pattern = re.compile(r"step:(\S+)\s.*?loss:(\S+)\s.*?grdn:(\S+)\s.*?lr:(\S+)")
+        with open(log_path) as f:
+            for line in f:
+                m = pattern.search(line)
+                if m:
+                    step_str = m.group(1).replace("K", "000").replace("M", "000000")
+                    records.append({
+                        "step": int(float(step_str)),
+                        "loss": float(m.group(2)),
+                        "grad_norm": float(m.group(3)),
+                        "lr": float(m.group(4)),
+                    })
+
+    return records
+
+
+def plot_loss_curve(log_path: Path, output_path: Path) -> None:
+    """Plot training loss (and optionally val_loss / lr) vs step from a log file."""
+    records = parse_lerobot_log(log_path)
 
     if not records:
         fig, ax = plt.subplots()

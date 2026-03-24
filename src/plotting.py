@@ -30,9 +30,12 @@ def parse_lerobot_log(log_path: Path) -> list[dict]:
             for line in f:
                 line = line.strip()
                 if line:
-                    records.append(json.loads(line))
-    elif "," in first_line and not first_line.startswith("step:"):
-        # CSV format
+                    try:
+                        records.append(json.loads(line))
+                    except json.JSONDecodeError:
+                        continue
+    elif str(log_path).endswith(".csv"):
+        # CSV format (only for .csv extension to avoid false positives)
         with open(log_path) as f:
             reader = csv.DictReader(f)
             for row in reader:

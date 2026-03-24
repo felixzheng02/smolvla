@@ -61,14 +61,17 @@ def config_to_cli_args(config: dict[str, Any]) -> list[str]:
         {"policy": {"path": "x"}} -> ["--policy.path=x"]
 
     Booleans become true/false strings. None values are 'null'.
-    Lists are joined with commas.
+    Lists are formatted as JSON arrays (draccus format).
     """
+    import json
+
     args: list[str] = []
     for key, value in _flatten(config):
         if isinstance(value, bool):
             args.append(f"--{key}={str(value).lower()}")
         elif isinstance(value, list):
-            args.append(f"--{key}={','.join(str(v) for v in value)}")
+            # draccus expects JSON array syntax: '[0,1,2]'
+            args.append(f"--{key}={json.dumps(value)}")
         elif value is None:
             args.append(f"--{key}=null")
         else:

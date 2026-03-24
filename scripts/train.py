@@ -74,6 +74,55 @@ def _set_nested(d: dict[str, Any], dotted_key: str, value: Any) -> None:
     d[keys[-1]] = value
 
 
+def _resolve_episode_fraction(config: dict[str, Any]) -> dict[str, Any]:
+    """Convert dataset.episode_fraction to explicit episode list for lerobot-train.
+
+    If dataset.episode_fraction is set (e.g., 0.25), loads dataset metadata to
+    compute a stratified subset of episodes, then replaces it with dataset.episodes.
+    """
+    ds = config.get("dataset", {})
+    fraction = ds.pop("episode_fraction", None)
+    if fraction is None:
+        return config
+
+    import random
+
+    from src.dataset import stratified_split
+
+    # Load episode-task mapping from the dataset
+    repo_id = ds.get("repo_id", "lerobot/libero_10_image")
+    try:
+        from lerobot.datasets.lerobot_dataset import LeRobotDataset
+
+        dataset = LeRobotDataset(repo_id)
+        # Build episodes_per_task mapping
+        episodes_per_task: dict[str, list[int]] = {}
+        if hasattr(dataset.meta, "tasks") and dataset.meta.tasks:
+            task_descriptions = dataset.meta.tasks
+            for ep_idx, ep_info in dataset.meta.episodes.items():
+                task_idx = ep_info.get("task_index", 0)
+                task = task_descriptions.get(task_idx, f"task_{task_idx}")
+                episodes_per_task.setdefault(task, []).append(int(ep_idx))
+        else:
+            episodes_per_task["default"] = list(range(dataset.num_episodes))
+    except Exception:
+        # Fallback: assume 379 episodes, no stratification
+        all_eps = list(range(379))
+        random.seed(42)
+        random.shuffle(all_eps)
+        n = max(1, int(len(all_eps) * fraction))
+        ds["episodes"] = sorted(all_eps[:n])
+        return config
+
+    # Use stratified split to get a representative subset
+    # val_fraction = 1 - fraction gives us a train set of size fraction
+    train_eps, _ = stratified_split(episodes_per_task, val_fraction=1.0 - fraction, seed=42)
+    ds["episodes"] = sorted(train_eps)
+    print(f"Data ablation: using {len(train_eps)}/{sum(len(v) for v in episodes_per_task.values())} "
+          f"episodes ({fraction:.0%})")
+    return config
+
+
 def main(argv: list[str] | None = None) -> int:
     """Load config, apply overrides, and run lerobot-train."""
     if argv is None:
@@ -84,6 +133,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if overrides:
         config = merge_configs(config, overrides)
+
+    # Handle episode_fraction -> episodes conversion
+    config = _resolve_episode_fraction(config)
 
     cmd = build_train_command(config)
     print(" ".join(cmd))

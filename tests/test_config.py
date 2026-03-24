@@ -110,7 +110,12 @@ class TestConfigToCliArgs:
     def test_list_values(self):
         config = {"targets": ["q_proj", "v_proj"]}
         args = config_to_cli_args(config)
-        assert "--targets=q_proj,v_proj" in args
+        assert '--targets=["q_proj", "v_proj"]' in args
+
+    def test_list_int_values(self):
+        config = {"dataset": {"episodes": [0, 1, 5, 10]}}
+        args = config_to_cli_args(config)
+        assert "--dataset.episodes=[0, 1, 5, 10]" in args
 
 
 class TestBuildTrainCommand:

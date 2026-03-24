@@ -6,7 +6,56 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **ndimensions labs SmolVLA 1-Day Challenge** — fine-tune SmolVLA (450M param VLA model) on LIBERO manipulation tasks using LoRA, evaluate in simulation (ID + OOD), run ablations. Spec: `ndims_AI_short.pdf`.
 
-**Stack:** Python, PyTorch, LeRobot framework (`lerobot[smolvla,peft]`), robosuite + MuJoCo (LIBERO sim), wandb.
+**Stack:** Python 3.11, PyTorch, LeRobot framework (`lerobot[smolvla,peft]`), robosuite + MuJoCo (LIBERO sim), wandb.
+
+## Environment Setup
+
+```bash
+# All work uses the 'smolvla' mamba environment
+mamba activate smolvla
+
+# Or prefix commands with:
+mamba run -n smolvla <command>
+```
+
+## Commands
+
+```bash
+# Run all tests
+mamba run -n smolvla python -m pytest tests/ -v
+
+# Run a single test file
+mamba run -n smolvla python -m pytest tests/test_config.py -v
+
+# Run a single test
+mamba run -n smolvla python -m pytest tests/test_config.py::TestMergeConfigs::test_deep_merge -v
+
+# Part 1: Dataset analysis
+mamba run -n smolvla python scripts/analyze.py
+
+# Part 2: Training (single command, reproducible)
+mamba run -n smolvla python scripts/train.py --config configs/base.yaml
+
+# Part 3: Plot training diagnostics
+mamba run -n smolvla python scripts/plot.py --run outputs/train/main
+
+# Part 4: Evaluation
+mamba run -n smolvla python scripts/evaluate.py --checkpoint outputs/train/main --mode id
+mamba run -n smolvla python scripts/evaluate.py --checkpoint outputs/train/main --mode ood-instructions
+mamba run -n smolvla python scripts/evaluate.py --checkpoint outputs/train/main --mode ood-cross-suite
+
+# Part 5: Ablation (runs all variants)
+mamba run -n smolvla python scripts/ablate.py --base configs/base.yaml --ablations configs/ablations/
+
+# Direct lerobot-train equivalent:
+lerobot-train \
+  --policy.path=lerobot/smolvla_base \
+  --dataset.repo_id=lerobot/libero_10_image \
+  --peft.method_type=LORA --peft.r=32 \
+  --policy.optimizer_lr=1e-3 \
+  --batch_size=8 --steps=20000 \
+  --output_dir=outputs/train/main
+```
 
 ## Key Decisions
 
@@ -17,66 +66,21 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **OOD conditions:** (1) paraphrased instructions, (2) cross-suite transfer to `libero_spatial`
 - **Ablations:** dataset size (25%/50%/100%), training steps (5k/10k/20k), LoRA rank (8/32/64)
 
-## Project Structure
+## Architecture
 
-```
-scripts/                       # Entry points (one per challenge part)
-  analyze.py                   # Part 1: dataset EDA → stats + train/val split
-  train.py                     # Part 2: launches lerobot-train with config
-  evaluate.py                  # Part 4: ID + OOD evaluation, video recording
-  ablate.py                    # Part 5: ablation grid (train + eval per variant)
-  plot.py                      # Part 3: diagnostic plots from training logs
+**Two-layer design:** `scripts/` are thin entry points (parse args → call `src/` → save outputs). `src/` contains reusable modules.
 
-src/                           # Reusable modules imported by scripts
-  config.py                    # Load YAML configs, merge overrides, map to lerobot-train args
-  dataset.py                   # Dataset loading, stats, train/val split, subsetting
-  evaluator.py                 # LIBERO env setup, policy rollout, metrics, video capture
-  ood.py                       # OOD handlers: instruction paraphrases + cross-suite setup
-  plotting.py                  # Loss curves, eval bar charts, ablation comparison plots
+- `src/config.py` — YAML loading, deep-merge of base + override configs, conversion to `lerobot-train` CLI args. Ablation configs in `configs/ablations/` only specify overrides; `merge_configs()` handles the rest.
+- `src/dataset.py` — Dataset stats computation from metadata dicts + episode-task mappings (no LeRobot dependency). Stratified train/val splitting, episode subsetting for data-size ablations. Split persistence via JSON.
+- `scripts/analyze.py` — The only file that imports LeRobot directly (lazy import). Extracts metadata from `LeRobotDataset` objects and feeds it to `src/dataset.py` functions.
 
-configs/
-  base.yaml                    # Full training config (all defaults)
-  ablations/                   # Override-only configs (merged on top of base)
-    rank_8.yaml, rank_64.yaml, steps_5k.yaml, steps_10k.yaml, data_25pct.yaml, data_50pct.yaml
+**Not yet built:** `src/evaluator.py` (LIBERO rollouts), `src/ood.py` (paraphrases + cross-suite), `src/plotting.py`, `scripts/train.py`, `scripts/evaluate.py`, `scripts/ablate.py`, `scripts/plot.py`.
 
-outputs/                       # gitignored — checkpoints, wandb logs, intermediates
-results/                       # Submission artifacts — plots, eval JSONs, videos
-```
+## Config System
 
-## Commands
+`configs/base.yaml` has all training defaults. Ablation configs (e.g., `configs/ablations/rank_8.yaml`) only specify what differs. `src/config.py:load_config(base, override)` deep-merges them. `config_to_cli_args()` flattens nested dicts to dot-separated `lerobot-train` flags (e.g., `policy.path` → `--policy.path=...`).
 
-```bash
-# Install
-pip install -r requirements.txt
-
-# Part 1: Dataset analysis
-python scripts/analyze.py
-
-# Part 2: Training (single command, reproducible)
-python scripts/train.py --config configs/base.yaml
-
-# Part 3: Plot training diagnostics
-python scripts/plot.py --run outputs/train/main
-
-# Part 4: Evaluation
-python scripts/evaluate.py --checkpoint outputs/train/main --mode id
-python scripts/evaluate.py --checkpoint outputs/train/main --mode ood-instructions
-python scripts/evaluate.py --checkpoint outputs/train/main --mode ood-cross-suite
-
-# Part 5: Ablation (runs all variants)
-python scripts/ablate.py --base configs/base.yaml --ablations configs/ablations/
-
-# Direct lerobot-train (equivalent to scripts/train.py):
-lerobot-train \
-  --policy.path=lerobot/smolvla_base \
-  --dataset.repo_id=lerobot/libero_10_image \
-  --peft.method_type=LORA --peft.r=32 \
-  --policy.optimizer_lr=1e-3 \
-  --batch_size=8 --steps=20000 \
-  --output_dir=outputs/train/main
-```
-
-## Architecture Notes
+## SmolVLA Architecture Notes
 
 **SmolVLA** = SigLIP vision encoder (frozen) + SmolLM2-360M language decoder + Flow Matching action expert (~100M params). Outputs action chunks (50 steps × action_dim). Uses 64 visual tokens per frame via PixelShuffle.
 
@@ -88,9 +92,9 @@ lerobot-train \
 
 ## Code Conventions
 
-- Scripts are thin entry points: parse args → call `src/` modules → save outputs
-- Configs are override-only YAML: ablation configs only specify what differs from `base.yaml`; `src/config.py` handles merging
 - `outputs/` is ephemeral (gitignored); `results/` is for submission artifacts
+- Heavy dependencies (LeRobot, robosuite) are lazy-imported only in `scripts/`, keeping `src/` unit-testable with mocks
+- Tests use pytest fixtures with mock metadata matching `lerobot/libero_10_image` structure
 
 ## Deliverables Checklist
 

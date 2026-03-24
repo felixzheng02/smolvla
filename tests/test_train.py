@@ -112,7 +112,7 @@ class TestBuildTrainCommand:
         config = load_config("configs/base.yaml")
         cmd = build_train_command(config)
         assert cmd[0] == "lerobot-train"
-        assert "--policy.path=lerobot/smolvla_base" in cmd
+        assert "--policy.pretrained_path=lerobot/smolvla_base" in cmd
         assert "--steps=20000" in cmd
         assert "--batch_size=8" in cmd
         assert "--wandb.enable=true" in cmd

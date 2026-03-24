@@ -21,7 +21,7 @@ mamba run -n smolvla <command>
 ## Commands
 
 ```bash
-# Run all tests
+# Run all tests (128 tests)
 mamba run -n smolvla python -m pytest tests/ -v
 
 # Run a single test file
@@ -33,28 +33,23 @@ mamba run -n smolvla python -m pytest tests/test_config.py::TestMergeConfigs::te
 # Part 1: Dataset analysis
 mamba run -n smolvla python scripts/analyze.py
 
-# Part 2: Training (single command, reproducible)
+# Part 2: Training (supports --config, --override, and --key=value overrides)
 mamba run -n smolvla python scripts/train.py --config configs/base.yaml
+mamba run -n smolvla python scripts/train.py --override configs/ablations/rank_8.yaml
+mamba run -n smolvla python scripts/train.py --steps=5000 --peft.r=16
 
 # Part 3: Plot training diagnostics
 mamba run -n smolvla python scripts/plot.py --run outputs/train/main
+mamba run -n smolvla python scripts/plot.py --results results/eval/id_results.json
 
-# Part 4: Evaluation
+# Part 4: Evaluation (three modes)
 mamba run -n smolvla python scripts/evaluate.py --checkpoint outputs/train/main --mode id
 mamba run -n smolvla python scripts/evaluate.py --checkpoint outputs/train/main --mode ood-instructions
 mamba run -n smolvla python scripts/evaluate.py --checkpoint outputs/train/main --mode ood-cross-suite
 
-# Part 5: Ablation (runs all variants)
+# Part 5: Ablation grid (trains + evaluates all variants)
 mamba run -n smolvla python scripts/ablate.py --base configs/base.yaml --ablations configs/ablations/
-
-# Direct lerobot-train equivalent:
-lerobot-train \
-  --policy.path=lerobot/smolvla_base \
-  --dataset.repo_id=lerobot/libero_10_image \
-  --peft.method_type=LORA --peft.r=32 \
-  --policy.optimizer_lr=1e-3 \
-  --batch_size=8 --steps=20000 \
-  --output_dir=outputs/train/main
+mamba run -n smolvla python scripts/ablate.py --skip-training --skip-eval  # replot from existing results
 ```
 
 ## Key Decisions
@@ -68,17 +63,22 @@ lerobot-train \
 
 ## Architecture
 
-**Two-layer design:** `scripts/` are thin entry points (parse args → call `src/` → save outputs). `src/` contains reusable modules.
+**Two-layer design:** `scripts/` are thin CLI entry points (parse args → call `src/` → save outputs). `src/` contains reusable, unit-testable modules with no heavy dependencies.
 
-- `src/config.py` — YAML loading, deep-merge of base + override configs, conversion to `lerobot-train` CLI args. Ablation configs in `configs/ablations/` only specify overrides; `merge_configs()` handles the rest.
-- `src/dataset.py` — Dataset stats computation from metadata dicts + episode-task mappings (no LeRobot dependency). Stratified train/val splitting, episode subsetting for data-size ablations. Split persistence via JSON.
-- `scripts/analyze.py` — The only file that imports LeRobot directly (lazy import). Extracts metadata from `LeRobotDataset` objects and feeds it to `src/dataset.py` functions.
+### Config pipeline (`src/config.py` → `scripts/train.py`)
+`configs/base.yaml` has all training defaults. Ablation configs in `configs/ablations/` only specify overrides. The merge chain is: base YAML → override YAML → CLI `--key=value` args. `config_to_cli_args()` flattens nested dicts to dot-separated `lerobot-train` flags. `scripts/train.py` adds its own CLI override parsing (`_cast_value`, `_set_nested`) on top, then calls `lerobot-train` via subprocess.
 
-**Not yet built:** `src/evaluator.py` (LIBERO rollouts), `src/ood.py` (paraphrases + cross-suite), `src/plotting.py`, `scripts/train.py`, `scripts/evaluate.py`, `scripts/ablate.py`, `scripts/plot.py`.
+### Dataset analysis (`src/dataset.py` → `scripts/analyze.py`)
+`src/dataset.py` works with plain dicts/lists (no LeRobot dependency): `compute_stats()` takes metadata + episode-task mapping, `stratified_split()` ensures per-task val representation, `subset_episodes()` enables data-size ablations. `scripts/analyze.py` is the only file that lazy-imports `LeRobotDataset` to extract metadata, then delegates to `src/dataset.py`.
 
-## Config System
+### Evaluation (`src/evaluator.py` + `src/ood.py` → `scripts/evaluate.py`)
+`src/evaluator.py` defines a Protocol-based `Env` interface and generic `run_rollout()`/`run_evaluation()` functions that take any env + policy callable — fully testable with mock objects. `EvalResults` aggregates per-task and overall success rates with JSON persistence. `src/ood.py` provides `paraphrase_instruction()` (lookup dict for 10 LIBERO-10 tasks + synonym fallback) and `get_cross_suite_config()` for transfer targets. `scripts/evaluate.py` handles the heavy LIBERO/robosuite/SmolVLA imports.
 
-`configs/base.yaml` has all training defaults. Ablation configs (e.g., `configs/ablations/rank_8.yaml`) only specify what differs. `src/config.py:load_config(base, override)` deep-merges them. `config_to_cli_args()` flattens nested dicts to dot-separated `lerobot-train` flags (e.g., `policy.path` → `--policy.path=...`).
+### Ablation (`scripts/ablate.py`)
+Discovers all YAML files in `configs/ablations/`, runs `scripts/train.py` + `scripts/evaluate.py` for each variant plus a baseline, collects `*_results.json` files, and generates comparison plots via `src/plotting.py`. Supports `--skip-training` and `--skip-eval` to rerun from existing checkpoints/results.
+
+### Plotting (`src/plotting.py` → `scripts/plot.py`)
+Three plot types: `plot_loss_curve()` (JSON lines or CSV logs), `plot_eval_results()` (bar chart), `plot_ablation_comparison()` (grouped bars). All use `matplotlib.use("Agg")` for headless rendering.
 
 ## SmolVLA Architecture Notes
 
@@ -94,7 +94,8 @@ lerobot-train \
 
 - `outputs/` is ephemeral (gitignored); `results/` is for submission artifacts
 - Heavy dependencies (LeRobot, robosuite) are lazy-imported only in `scripts/`, keeping `src/` unit-testable with mocks
-- Tests use pytest fixtures with mock metadata matching `lerobot/libero_10_image` structure
+- Tests use pytest class-based organization with fixtures providing mock metadata matching `lerobot/libero_10_image` structure
+- All `src/` modules use `from __future__ import annotations` and type hints
 
 ## Deliverables Checklist
 

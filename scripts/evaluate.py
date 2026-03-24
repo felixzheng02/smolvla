@@ -13,7 +13,7 @@ from src.ood import get_cross_suite_config, paraphrase_instruction
 
 def load_policy(checkpoint_path: str):
     """Load a fine-tuned SmolVLA policy from checkpoint."""
-    from lerobot.common.policies.smolvla.modeling_smolvla import SmolVLAPolicy
+    from lerobot.policies.smolvla.modeling_smolvla import SmolVLAPolicy
 
     policy = SmolVLAPolicy.from_pretrained(checkpoint_path)
     policy.eval()

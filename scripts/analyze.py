@@ -12,7 +12,7 @@ from src.dataset import compute_stats, save_split, stratified_split
 
 def load_lerobot_dataset(repo_id: str):
     """Load a LeRobot dataset from HuggingFace Hub."""
-    from lerobot.common.datasets.lerobot_dataset import LeRobotDataset
+    from lerobot.datasets.lerobot_dataset import LeRobotDataset
 
     return LeRobotDataset(repo_id)
 

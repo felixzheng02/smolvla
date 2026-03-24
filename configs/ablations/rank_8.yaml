@@ -1,0 +1,5 @@
+# Ablation: LoRA rank 8 (vs base rank 32)
+peft:
+  r: 8
+output_dir: outputs/train/ablation_rank_8
+job_name: ablation_rank_8

@@ -1,0 +1,9 @@
+lerobot[smolvla,peft]
+robosuite==1.4.1
+libero
+mujoco>=2.3.0
+wandb
+matplotlib
+pandas
+pyyaml
+pytest

@@ -1,0 +1,11 @@
+outputs/
+__pycache__/
+*.pyc
+*.egg-info/
+.eggs/
+dist/
+build/
+*.pt
+*.safetensors
+wandb/
+.env

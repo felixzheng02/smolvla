@@ -1,0 +1,28 @@
+# Base training config for SmolVLA LoRA fine-tuning on LIBERO-10
+policy:
+  path: lerobot/smolvla_base
+  device: cuda
+  optimizer_lr: 1.0e-3
+  scheduler_decay_lr: 1.0e-4
+  # Nullify to use checkpoint defaults
+  output_features: null
+  input_features: null
+
+dataset:
+  repo_id: lerobot/libero_10_image
+
+env:
+  type: libero
+  task: libero_10
+
+peft:
+  method_type: LORA
+  r: 32
+
+batch_size: 8
+steps: 20000
+output_dir: outputs/train/main
+job_name: smolvla_libero10_lora
+
+wandb:
+  enable: true

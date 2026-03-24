@@ -1,0 +1,4 @@
+# Ablation: 10k training steps (vs base 20k)
+steps: 10000
+output_dir: outputs/train/ablation_steps_10k
+job_name: ablation_steps_10k

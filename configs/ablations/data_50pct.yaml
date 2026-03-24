@@ -1,0 +1,5 @@
+# Ablation: 50% of training episodes (vs base 100%)
+dataset:
+  episode_fraction: 0.50
+output_dir: outputs/train/ablation_data_50pct
+job_name: ablation_data_50pct

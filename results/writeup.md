@@ -66,4 +66,4 @@ I added Gaussian noise (σ=0.05) to all camera observations at inference time, s
 1. **Training-time image augmentation** — random crops, color jitter, and Gaussian noise would directly address the 41% visual-OOD drop at near-zero compute cost.
 2. **Instruction augmentation during training** — randomly substitute paraphrased instructions during fine-tuning to prevent instruction memorization and preserve language grounding. This is the most impactful change suggested by our results.
 3. **Temporal ensembling** (`n_action_steps=1`) — re-predict every step rather than executing full 50-step chunks.
-4. **More Training Steps" — rotation loss not converge yet.
+4. **More Training Steps** — rotation loss not converge yet.

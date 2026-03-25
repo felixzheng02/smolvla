@@ -35,6 +35,7 @@ class EvalResults:
 
     @property
     def per_task_success_rate(self) -> dict[str, float]:
+        """Compute success rate (0–1) for each task."""
         rates = {}
         for task, results in self.task_results.items():
             if results:
@@ -45,12 +46,14 @@ class EvalResults:
 
     @property
     def overall_success_rate(self) -> float:
+        """Compute overall success rate across all tasks and episodes."""
         all_results = [r for rs in self.task_results.values() for r in rs]
         if not all_results:
             return 0.0
         return sum(r.success for r in all_results) / len(all_results)
 
     def summary(self) -> dict[str, Any]:
+        """Return a JSON-serializable summary dict with overall and per-task rates."""
         return {
             "mode": self.mode,
             "overall_success_rate": self.overall_success_rate,
@@ -59,6 +62,7 @@ class EvalResults:
         }
 
     def save(self, path: str | Path) -> None:
+        """Write the summary dict to a JSON file, creating parent dirs as needed."""
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(self.summary(), indent=2))

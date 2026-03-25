@@ -1,3 +1,9 @@
+"""Part 3: Plot training diagnostics and evaluation results.
+
+Generates loss curves from lerobot training logs and bar charts from
+evaluation result JSON files. All plots are saved to results/plots/.
+"""
+
 from __future__ import annotations
 
 import argparse

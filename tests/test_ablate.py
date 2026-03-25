@@ -11,10 +11,10 @@ from scripts.ablate import collect_eval_results, discover_ablation_configs, run_
 class TestDiscoverAblationConfigs:
     def test_finds_yaml_files(self, tmp_path):
         (tmp_path / "rank_8.yaml").write_text("peft:\n  r: 8\n")
-        (tmp_path / "rank_64.yaml").write_text("peft:\n  r: 64\n")
+        (tmp_path / "rank_128.yaml").write_text("peft:\n  r: 128\n")
         (tmp_path / "not_yaml.txt").write_text("ignore me")
         configs = discover_ablation_configs(tmp_path)
-        assert set(configs.keys()) == {"rank_8", "rank_64"}
+        assert set(configs.keys()) == {"rank_8", "rank_128"}
 
     def test_empty_dir(self, tmp_path):
         assert discover_ablation_configs(tmp_path) == {}

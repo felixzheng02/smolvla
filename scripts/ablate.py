@@ -110,6 +110,7 @@ def run_ablation_grid(
 
 
 def main():
+    """Discover ablation configs, run the train+eval grid, and generate comparison plots."""
     parser = argparse.ArgumentParser(description="Run ablation experiments")
     parser.add_argument("--base", default="configs/base.yaml", help="Base config path")
     parser.add_argument("--ablations", default="configs/ablations/", help="Ablation configs dir")

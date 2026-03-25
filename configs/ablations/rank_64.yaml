@@ -1,5 +1,0 @@
-# Ablation: LoRA rank 64 (vs base rank 32)
-peft:
-  r: 64
-output_dir: outputs/train/ablation_rank_64
-job_name: ablation_rank_64

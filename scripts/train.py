@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import subprocess
 import sys
+from pathlib import Path
 from typing import Any
 
 from src.config import build_train_command, load_config, merge_configs
@@ -138,8 +139,8 @@ def main(argv: list[str] | None = None) -> int:
     cmd = build_train_command(config)
     print(" ".join(cmd))
 
-    result = subprocess.run(cmd)
-    return result.returncode
+    proc = subprocess.run(cmd)
+    return proc.returncode
 
 
 if __name__ == "__main__":

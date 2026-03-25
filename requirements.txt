@@ -1,5 +1,4 @@
-lerobot[smolvla,peft]
-robosuite==1.4.1
+lerobot[smolvla,peft]==0.4.4
 libero
 mujoco>=2.3.0
 wandb

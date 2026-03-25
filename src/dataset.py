@@ -27,6 +27,7 @@ class DatasetStats:
     episodes_per_task: dict[str, list[int]] = field(default_factory=dict)
 
     def summary(self) -> str:
+        """Return a human-readable multi-line summary of the dataset."""
         lines = [
             f"Dataset: {self.repo_id}",
             f"Episodes: {self.total_episodes}",

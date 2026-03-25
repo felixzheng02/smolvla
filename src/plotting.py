@@ -1,3 +1,9 @@
+"""Plotting utilities: loss curves, eval bar charts, and ablation comparisons.
+
+All functions use matplotlib with the 'Agg' backend for headless rendering
+and write output directly to PNG files.
+"""
+
 from __future__ import annotations
 
 import csv
@@ -13,8 +19,13 @@ import numpy as np
 def parse_lerobot_log(log_path: Path) -> list[dict]:
     """Parse lerobot training log lines.
 
-    Handles the format: step:50 smpl:400 ep:1 loss:0.644 grdn:0.115 lr:4.0e-05
-    Also handles JSON lines and CSV formats.
+    Handles three formats:
+    - lerobot text: ``step:50 smpl:400 ep:1 epch:0.00 loss:0.644 grdn:0.115 lr:4e-05 updt_s:0.1 data_s:0.1``
+    - JSON lines
+    - CSV (only for .csv extension)
+
+    All key:value pairs from text logs are captured. Common field renames
+    are applied for consistency (grdn->grad_norm, updt_s->update_s, etc.).
     """
     import re
 
@@ -25,7 +36,6 @@ def parse_lerobot_log(log_path: Path) -> list[dict]:
         first_line = f.readline().strip()
 
     if first_line.startswith("{"):
-        # JSON lines format
         with open(log_path) as f:
             for line in f:
                 line = line.strip()
@@ -35,25 +45,31 @@ def parse_lerobot_log(log_path: Path) -> list[dict]:
                     except json.JSONDecodeError:
                         continue
     elif str(log_path).endswith(".csv"):
-        # CSV format (only for .csv extension to avoid false positives)
         with open(log_path) as f:
             reader = csv.DictReader(f)
             for row in reader:
                 records.append({k: float(v) for k, v in row.items()})
     else:
-        # lerobot log format: step:X smpl:Y loss:Z grdn:W lr:V
-        pattern = re.compile(r"step:(\S+)\s.*?loss:(\S+)\s.*?grdn:(\S+)\s.*?lr:(\S+)")
+        # Generic key:value parser for lerobot log format
+        kv_pattern = re.compile(r"(\w+):(\S+)")
+        renames = {"grdn": "grad_norm", "updt_s": "update_s", "data_s": "dataloading_s",
+                    "smpl": "samples", "ep": "episodes", "epch": "epochs"}
         with open(log_path) as f:
             for line in f:
-                m = pattern.search(line)
-                if m:
-                    step_str = m.group(1).replace("K", "000").replace("M", "000000")
-                    records.append({
-                        "step": int(float(step_str)),
-                        "loss": float(m.group(2)),
-                        "grad_norm": float(m.group(3)),
-                        "lr": float(m.group(4)),
-                    })
+                pairs = kv_pattern.findall(line)
+                if not pairs or not any(k == "step" for k, _ in pairs):
+                    continue
+                record: dict = {}
+                for k, v in pairs:
+                    k = renames.get(k, k)
+                    v_str = v.replace("K", "e3").replace("M", "e6")
+                    try:
+                        num = float(v_str)
+                        record[k] = int(num) if num == int(num) and "." not in v and "e" not in v.lower() else num
+                    except ValueError:
+                        record[k] = v
+                if "step" in record:
+                    records.append(record)
 
     return records
 

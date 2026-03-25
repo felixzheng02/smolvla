@@ -9,3 +9,8 @@ build/
 *.safetensors
 wandb/
 .env
+*.pdf
+CLAUDE.md
+*.mp4
+*.png
+*.json

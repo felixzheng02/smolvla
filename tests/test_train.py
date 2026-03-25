@@ -113,8 +113,10 @@ class TestBuildTrainCommand:
         cmd = build_train_command(config)
         assert cmd[0] == "lerobot-train"
         assert "--policy.pretrained_path=lerobot/smolvla_base" in cmd
-        assert "--steps=20000" in cmd
-        assert "--batch_size=8" in cmd
+        assert "--steps=50000" in cmd
+        assert "--batch_size=32" in cmd
+        assert "--peft.r=64" in cmd
+        assert "--save_freq=2000" in cmd
         assert "--wandb.enable=true" in cmd
 
     def test_cli_overrides_applied(self):
@@ -127,8 +129,77 @@ class TestBuildTrainCommand:
         assert "--steps=5000" in cmd
         assert "--batch_size=16" in cmd
         # Original values should be gone
-        assert "--steps=20000" not in cmd
-        assert "--batch_size=8" not in cmd
+        assert "--steps=50000" not in cmd
+        assert "--batch_size=32" not in cmd
+
+
+class TestBaseConfigValues:
+    """Verify base.yaml contains the expected training hyperparameters."""
+
+    def test_steps(self):
+        config = load_config("configs/base.yaml")
+        assert config["steps"] == 50000
+
+    def test_batch_size(self):
+        config = load_config("configs/base.yaml")
+        assert config["batch_size"] == 32
+
+    def test_lora_rank(self):
+        config = load_config("configs/base.yaml")
+        assert config["peft"]["r"] == 64
+
+    def test_save_freq(self):
+        config = load_config("configs/base.yaml")
+        assert config["save_freq"] == 2000
+
+    def test_eval_freq_disabled(self):
+        config = load_config("configs/base.yaml")
+        assert config["eval_freq"] == 0
+
+    def test_learning_rate(self):
+        config = load_config("configs/base.yaml")
+        assert config["policy"]["optimizer_lr"] == 1e-3
+
+
+class TestAblationOverrides:
+    """Verify ablation configs override the correct base values."""
+
+    def test_rank_8_overrides_base(self):
+        config = load_config("configs/base.yaml", "configs/ablations/rank_8.yaml")
+        assert config["peft"]["r"] == 8
+        assert config["steps"] == 50000  # unchanged
+
+    def test_rank_32_overrides_base(self):
+        config = load_config("configs/base.yaml", "configs/ablations/rank_32.yaml")
+        assert config["peft"]["r"] == 32
+        assert config["batch_size"] == 32  # unchanged
+
+    def test_rank_128_overrides_base(self):
+        config = load_config("configs/base.yaml", "configs/ablations/rank_128.yaml")
+        assert config["peft"]["r"] == 128
+
+    def test_steps_5k_overrides_base(self):
+        config = load_config("configs/base.yaml", "configs/ablations/steps_5k.yaml")
+        assert config["steps"] == 5000
+        assert config["peft"]["r"] == 64  # unchanged
+
+    def test_steps_10k_overrides_base(self):
+        config = load_config("configs/base.yaml", "configs/ablations/steps_10k.yaml")
+        assert config["steps"] == 10000
+
+    def test_data_25pct_overrides_base(self):
+        config = load_config("configs/base.yaml", "configs/ablations/data_25pct.yaml")
+        assert config["dataset"]["episode_fraction"] == 0.25
+        assert config["peft"]["r"] == 64  # unchanged
+
+    def test_all_ablations_preserve_base_model(self):
+        """Every ablation should still use the same pretrained model."""
+        import glob
+        for path in sorted(glob.glob("configs/ablations/*.yaml")):
+            config = load_config("configs/base.yaml", path)
+            assert config["policy"]["pretrained_path"] == "lerobot/smolvla_base", (
+                f"{path} changed pretrained_path"
+            )
 
 
 class TestMain:
@@ -150,7 +221,7 @@ class TestMain:
         assert exit_code == 0
         cmd = mock_run.call_args[0][0]
         assert "--steps=5000" in cmd
-        assert "--steps=20000" not in cmd
+        assert "--steps=50000" not in cmd
 
     @patch("scripts.train.subprocess.run")
     def test_main_returns_exit_code(self, mock_run: MagicMock):

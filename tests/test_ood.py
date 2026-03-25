@@ -25,7 +25,7 @@ class TestParaphraseKnown:
             assert p != instruction
 
     def test_known_instruction_case_insensitive(self):
-        upper = "Pick Up The Black Bowl On The Left And Place It On The Plate"
+        upper = "Put Both The Alphabet Soup And The Tomato Sauce In The Basket"
         result = paraphrase_instruction(upper)
         assert len(result) >= 2
 
